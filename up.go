@@ -11,6 +11,7 @@ import (
 type options struct {
 	allowMissing bool
 	applyUpByOne bool
+	noVersioning bool
 }
 
 type OptionsFunc func(o *options)
@@ -19,15 +20,16 @@ func WithAllowMissing() OptionsFunc {
 	return func(o *options) { o.allowMissing = true }
 }
 
+func WithNoVersioning() OptionsFunc {
+	return func(o *options) { o.noVersioning = true }
+}
+
 func withApplyUpByOne() OptionsFunc {
 	return func(o *options) { o.applyUpByOne = true }
 }
 
 // UpTo migrates up to a specific version.
 func UpTo(db *sql.DB, dir string, version int64, opts ...OptionsFunc) error {
-	if _, err := EnsureDBVersion(db); err != nil {
-		return err
-	}
 	option := &options{}
 	for _, f := range opts {
 		f(option)
@@ -36,42 +38,47 @@ func UpTo(db *sql.DB, dir string, version int64, opts ...OptionsFunc) error {
 	if err != nil {
 		return err
 	}
-	dbMigrations, err := listAllDBVersions(db)
-	if err != nil {
-		return err
-	}
 
-	missingMigrations := findMissingMigrations(dbMigrations, foundMigrations)
-
-	// feature(mf): It is very possible someone may want to apply ONLY new migrations
-	// and skip missing migrations altogether. At the moment this is not supported,
-	// but leaving this comment because that's where that logic will be handled.
-	if len(missingMigrations) > 0 && !option.allowMissing {
-		var collected []string
-		for _, m := range missingMigrations {
-			output := fmt.Sprintf("version %d: %s", m.Version, m.Source)
-			collected = append(collected, output)
+	if !option.noVersioning {
+		if _, err := EnsureDBVersion(db); err != nil {
+			return err
 		}
-		return fmt.Errorf("error: found %d missing migrations:\n\t%s",
-			len(missingMigrations), strings.Join(collected, "\n\t"))
-	}
-
-	if option.allowMissing {
-		return upWithMissing(
-			db,
-			missingMigrations,
-			foundMigrations,
-			dbMigrations,
-			option,
-		)
+		dbMigrations, err := listAllDBVersions(db)
+		if err != nil {
+			return err
+		}
+		missingMigrations := findMissingMigrations(dbMigrations, foundMigrations)
+		// feature(mf): It is very possible someone may want to apply ONLY new migrations
+		// and skip missing migrations altogether. At the moment this is not supported,
+		// but leaving this comment because that's where that logic will be handled.
+		if len(missingMigrations) > 0 && !option.allowMissing {
+			var collected []string
+			for _, m := range missingMigrations {
+				output := fmt.Sprintf("version %d: %s", m.Version, m.Source)
+				collected = append(collected, output)
+			}
+			return fmt.Errorf("error: found %d missing migrations:\n\t%s",
+				len(missingMigrations), strings.Join(collected, "\n\t"))
+		}
+		if option.allowMissing {
+			return upWithMissing(
+				db,
+				missingMigrations,
+				foundMigrations,
+				dbMigrations,
+				option,
+			)
+		}
 	}
 
 	var current int64
 	for {
 		var err error
-		current, err = GetDBVersion(db)
-		if err != nil {
-			return err
+		if !option.noVersioning {
+			current, err = GetDBVersion(db)
+			if err != nil {
+				return err
+			}
 		}
 		next, err := foundMigrations.Next(current)
 		if err != nil {
@@ -85,6 +92,9 @@ func UpTo(db *sql.DB, dir string, version int64, opts ...OptionsFunc) error {
 		}
 		if option.applyUpByOne {
 			return nil
+		}
+		if option.noVersioning {
+			current = next.Version
 		}
 	}
 	// At this point there are no more migrations to apply. But we need to maintain

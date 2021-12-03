@@ -20,6 +20,7 @@ var (
 	certfile     = flags.String("certfile", "", "file path to root CA's certificates in pem format (only support on mysql)")
 	sequential   = flags.Bool("s", false, "use sequential numbering for new migrations")
 	allowMissing = flags.Bool("allow-missing", false, "applies missing (out-of-order) migrations")
+	noVersioning = flags.Bool("no-versioning", false, "run up or down commands without versioning, in file order, from directory pointed to")
 )
 
 var (
@@ -96,6 +97,9 @@ func main() {
 	options := []goose.OptionsFunc{}
 	if *allowMissing {
 		options = append(options, goose.WithAllowMissing())
+	}
+	if *noVersioning {
+		options = append(options, goose.WithNoVersioning())
 	}
 	if err := goose.RunWithOptions(
 		command,

@@ -6,10 +6,20 @@ import (
 )
 
 // Down rolls back a single migration from the current version.
-func Down(db *sql.DB, dir string) error {
-	currentVersion, err := GetDBVersion(db)
-	if err != nil {
-		return err
+func Down(db *sql.DB, dir string, opts ...OptionsFunc) error {
+	option := &options{}
+	for _, f := range opts {
+		f(option)
+	}
+	var (
+		currentVersion int64
+		err            error
+	)
+	if !option.noVersioning {
+		currentVersion, err = GetDBVersion(db)
+		if err != nil {
+			return err
+		}
 	}
 
 	migrations, err := CollectMigrations(dir, minVersion, maxVersion)
@@ -21,6 +31,7 @@ func Down(db *sql.DB, dir string) error {
 	if err != nil {
 		return fmt.Errorf("no migration %v", currentVersion)
 	}
+	current.noVersioning = option.noVersioning
 
 	return current.Down(db)
 }
