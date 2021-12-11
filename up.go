@@ -87,6 +87,8 @@ func UpTo(db *sql.DB, dir string, version int64, opts ...OptionsFunc) error {
 			}
 			return fmt.Errorf("failed to find next migration: %v", err)
 		}
+		next.noVersioning = option.noVersioning
+
 		if err := next.Up(db); err != nil {
 			return err
 		}

@@ -9,5 +9,5 @@ FROM
 	generate_series(1, 150) s (i);
 
 -- +goose Down
-DELETE FROM owners where owner_name LIKE 'seed-user-%' AND owner_id > 100 AND owner_id < 250;
+DELETE FROM owners where owner_name LIKE 'seed-user-%' AND owner_id > 100;
 SELECT setval('owners_owner_id_seq', max(owner_id)) FROM owners;

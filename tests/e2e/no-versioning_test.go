@@ -11,7 +11,8 @@ import (
 func TestUpNoVersioning(t *testing.T) {
 	const (
 		wantSeedOwnerCount = 250
-		wantOwnerCount     = 5
+		// These are owners created by migration files.
+		wantOwnerCount = 4
 	)
 	is := is.New(t)
 	db, err := newDockerDB(t)
@@ -38,7 +39,7 @@ func TestUpNoVersioning(t *testing.T) {
 
 	// Run (all) down migrations from the seed dir
 	{
-		err = goose.Down(db, seedDir, goose.WithNoVersioning())
+		err = goose.DownTo(db, seedDir, 0, goose.WithNoVersioning())
 		is.NoErr(err)
 		// Confirm no changes to the versioned schema in the DB
 		currentVersion, err := goose.GetDBVersion(db)
